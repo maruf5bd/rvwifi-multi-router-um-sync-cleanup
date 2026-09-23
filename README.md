@@ -21,6 +21,11 @@ Automated User Manager sync and expired code cleanup for a 3-router MikroTik hot
 ### `delete_expired_codes.py`
 Multi-source expiry comparison: scraped website codes (`lite_codes`) vs ledger snapshots (`um_ledger.db`) vs package derivation. Deletes expired UM users from all routers via REST API (primary) or SSH (fallback).
 
+**Grace & Retention Policy:**
+- **Running Session Grace (1 hour):** If a code is expired in the database but currently actively running on the hotspot/sessions, it is granted a 1-hour grace window. If still active after 1h, it is terminated and deleted.
+- **Used UM Retention (48 hours):** When a code expires and transitions to `used`/offline, it is immediately purged from Hotspot IP-bindings (`/ip/hotspot/ip-binding`) and active sessions, but retained in MikroTik User Manager (`/user-manager/user`) for 48 hours before permanent removal.
+- State is tracked persistently across runs in `code_cleanup_grace` within `sent_codes.db`.
+
 **Expiry resolution (4 tiers):**
 1. lite_codes.expiry_date (website)
 2. um_ledger.db R2 snapshot
@@ -30,6 +35,7 @@ Multi-source expiry comparison: scraped website codes (`lite_codes`) vs ledger s
 **Comparison logic:** single source → accept; 2+ same → accept (consensus); all within 12h → accept most authoritative; spread >12h → skip unless ALL sources are in the past.
 
 **Deletion order:** sessions → IP bindings → user-profile → user (per router).
+
 
 ### `sync_lite.py`
 Syncs codes from the website's lite page (`https://rvwifi.hostraj.com/public/l1/`) into SQLite. Quick mode fetches latest 100; `--full` paginates through all records.
